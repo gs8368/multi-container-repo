@@ -1,3 +1,51 @@
 {
-  "AWSEBDockerrunVersion": 3
+  "AWSEBDockerrunVersion":3,
+  "containerDefinitions": [
+    {
+      "name": "client",
+      "image": "gs8368/multi-client:latest",
+      "essential": true,
+      "memory": 128,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000
+        }
+      ]
+    },
+    {
+      "name": "api",
+      "image": "gs8368/multi-server:latest",
+      "essential": true,
+      "memory": 256,
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "hostPort": 5000
+        }
+      ]
+    },
+    {
+      "name": "worker",
+      "image": "gs8368/multi-worker:latest",
+      "essential": true,
+      "memory": 256
+    },
+    {
+      "name": "nginx",
+      "image": "gs8368/multi-nginx:latest",
+      "essential": true,
+      "memory": 128,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80
+        }
+      ],
+      "links": [
+        "client",
+        "api"
+      ]
+    }
+  ]
 }
