@@ -1,13 +1,5 @@
 version: '3'
 services:
-  client:
-    image: 'gurpreet1993/multi-client'
-    mem_limit: 256m
-    hostname: client
-    environment:
-      - HOST=0.0.0.0
-      - PORT=3000
-      - WDS_SOCKET_PORT=0
   server:
     image: 'gurpreet1993/multi-server'
     mem_limit: 128m
@@ -30,7 +22,7 @@ services:
       - REDIS_PORT=$REDIS_PORT
   nginx:
     image: 'gurpreet1993/multi-nginx'
-    mem_limit: 128m
+    mem_limit: 256m
     hostname: nginx
     ports:
       - '80:80'

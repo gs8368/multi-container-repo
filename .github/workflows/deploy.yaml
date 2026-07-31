@@ -14,7 +14,7 @@ jobs:
       - run: docker run -e CI=true ${{ secrets.DOCKER_USERNAME }}/react-test npm test
 
       - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-client -f ./client/Dockerfile.dev ./client
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-nginx -f ./nginx/Dockerfile.dev ./nginx
+      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-nginx -f ./nginx/Dockerfile .
       - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-server -f ./server/Dockerfile.dev ./server
       - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-worker -f ./worker/Dockerfile.dev ./worker
 
