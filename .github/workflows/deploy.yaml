@@ -52,7 +52,30 @@ jobs:
       - name: Generate deployment package
         run: |
           rm -f deploy.zip
-          zip -r deploy.zip Dockerrun.aws.json docker-compose.yml client server worker nginx .platform
+          rm -rf deploy_bundle
+          mkdir -p deploy_bundle
+
+          cp Dockerrun.aws.json deploy_bundle/
+          cp docker-compose.yml deploy_bundle/docker-compose.yml
+          cp -r client server worker nginx deploy_bundle/
+
+          if [ -d .platform ]; then
+            cp -r .platform deploy_bundle/
+          fi
+
+          # Keep deployed image names aligned with what CI just pushed.
+          sed -i "s|gurpreet1993/|${{ secrets.DOCKER_USERNAME }}/|g" deploy_bundle/docker-compose.yml
+          grep -E "image:" deploy_bundle/docker-compose.yml
+
+          FILES=(Dockerrun.aws.json docker-compose.yml client server worker nginx)
+          if [ -d deploy_bundle/.platform ]; then
+            FILES+=(.platform)
+          fi
+
+          (
+            cd deploy_bundle
+            zip -r ../deploy.zip "${FILES[@]}"
+          )
           unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml|Dockerfile.dev|package.json|default.conf'
           unzip -p deploy.zip Dockerrun.aws.json
 
