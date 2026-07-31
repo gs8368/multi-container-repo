@@ -3,13 +3,40 @@ on:
   push:
     branches:
       - main # check your repo, your default branch might be master!
+  workflow_dispatch:
+    inputs:
+      target_environment_name:
+        description: "Elastic Beanstalk target environment (compose-capable)"
+        required: false
+        default: "Multi-docker-compose-env"
+      old_environment_name:
+        description: "Previous environment for config copy/cutover/decommission"
+        required: false
+        default: "Multi-docker-env"
+      swap_cname:
+        description: "Swap CNAME from old environment to target"
+        required: false
+        default: "false"
+      terminate_old_environment:
+        description: "Terminate old environment after successful cutover"
+        required: false
+        default: "false"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: multi-docker
+      AWS_DEFAULT_REGION: ap-south-1
+      TARGET_ENVIRONMENT_NAME: ${{ github.event.inputs.target_environment_name || 'Multi-docker-compose-env' }}
+      OLD_ENVIRONMENT_NAME: ${{ github.event.inputs.old_environment_name || 'Multi-docker-env' }}
+      SWAP_CNAME: ${{ github.event.inputs.swap_cname || 'false' }}
+      TERMINATE_OLD_ENVIRONMENT: ${{ github.event.inputs.terminate_old_environment || 'false' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v3
-      - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/react-test -f ./client/Dockerfile.dev ./client
       - run: docker run -e CI=true ${{ secrets.DOCKER_USERNAME }}/react-test npm test
 
@@ -22,6 +49,67 @@ jobs:
       - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-nginx
       - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-server
       - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-worker
+
+      - name: Ensure target environment exists
+        run: |
+          set -euo pipefail
+
+          target_status="$(aws elasticbeanstalk describe-environments \
+            --application-name "$APP_NAME" \
+            --environment-names "$TARGET_ENVIRONMENT_NAME" \
+            --query 'Environments[0].Status' \
+            --output text 2>/dev/null || true)"
+
+          if [ -z "$target_status" ] || [ "$target_status" = "None" ]; then
+            if [ -z "${{ secrets.EB_COMPOSE_PLATFORM_ARN }}" ]; then
+              echo "Target environment does not exist and EB_COMPOSE_PLATFORM_ARN secret is missing."
+              echo "Create the environment manually on a Docker Compose-capable platform, or set EB_COMPOSE_PLATFORM_ARN."
+              exit 1
+            fi
+
+            aws elasticbeanstalk create-environment \
+              --application-name "$APP_NAME" \
+              --environment-name "$TARGET_ENVIRONMENT_NAME" \
+              --platform-arn "${{ secrets.EB_COMPOSE_PLATFORM_ARN }}"
+
+            aws elasticbeanstalk wait environment-exists \
+              --application-name "$APP_NAME" \
+              --environment-names "$TARGET_ENVIRONMENT_NAME"
+          fi
+
+      - name: Reapply configuration from old environment
+        run: |
+          set -euo pipefail
+
+          old_env_exists="$(aws elasticbeanstalk describe-environments \
+            --application-name "$APP_NAME" \
+            --environment-names "$OLD_ENVIRONMENT_NAME" \
+            --query 'length(Environments)' \
+            --output text 2>/dev/null || echo 0)"
+
+          if [ "$old_env_exists" = "0" ]; then
+            echo "Old environment '$OLD_ENVIRONMENT_NAME' does not exist; skipping config copy."
+            exit 0
+          fi
+
+          aws elasticbeanstalk describe-configuration-settings \
+            --application-name "$APP_NAME" \
+            --environment-name "$OLD_ENVIRONMENT_NAME" \
+            --output json > eb-config.json
+
+          jq '[.ConfigurationSettings[0].OptionSettings[]
+              | select(.Namespace == "aws:elasticbeanstalk:application:environment"
+                  or .Namespace == "aws:autoscaling:launchconfiguration"
+                  or .Namespace == "aws:autoscaling:asg"
+                  or .Namespace == "aws:ec2:vpc"
+                  or .Namespace == "aws:elb:healthcheck"
+                  or .Namespace == "aws:elasticbeanstalk:environment:process:default")
+            ]' eb-config.json > eb-config-options.json
+
+          aws elasticbeanstalk update-environment \
+            --application-name "$APP_NAME" \
+            --environment-name "$TARGET_ENVIRONMENT_NAME" \
+            --option-settings file://eb-config-options.json
 
       - name: Validate EB deployment files
         run: |
@@ -44,8 +132,68 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
           aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
           application_name: multi-docker
-          environment_name: Multi-docker-env
+          environment_name: ${{ env.TARGET_ENVIRONMENT_NAME }}
           existing_bucket_name: elasticbeanstalk-ap-south-1-243490674618
           region: ap-south-1
           version_label: ${{ github.sha }}-${{ github.run_id }}
           deployment_package: deploy.zip
+
+      - name: Validate target environment health and events
+        run: |
+          set -euo pipefail
+
+          for _ in $(seq 1 40); do
+            status="$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$TARGET_ENVIRONMENT_NAME" \
+              --query 'Environments[0].Status' \
+              --output text)"
+            health="$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$TARGET_ENVIRONMENT_NAME" \
+              --query 'Environments[0].Health' \
+              --output text)"
+
+            echo "status=$status health=$health"
+
+            if [ "$status" = "Ready" ] && [ "$health" = "Green" ]; then
+              break
+            fi
+
+            sleep 15
+          done
+
+          final_status="$(aws elasticbeanstalk describe-environments \
+            --application-name "$APP_NAME" \
+            --environment-names "$TARGET_ENVIRONMENT_NAME" \
+            --query 'Environments[0].Status' \
+            --output text)"
+          final_health="$(aws elasticbeanstalk describe-environments \
+            --application-name "$APP_NAME" \
+            --environment-names "$TARGET_ENVIRONMENT_NAME" \
+            --query 'Environments[0].Health' \
+            --output text)"
+
+          aws elasticbeanstalk describe-events \
+            --environment-name "$TARGET_ENVIRONMENT_NAME" \
+            --max-items 30 \
+            --query 'Events[].{Time:EventDate,Severity:Severity,Message:Message}' \
+            --output table
+
+          [ "$final_status" = "Ready" ] && [ "$final_health" = "Green" ]
+
+      - name: Swap CNAMEs with old environment
+        if: ${{ env.SWAP_CNAME == 'true' }}
+        run: |
+          set -euo pipefail
+          aws elasticbeanstalk swap-environment-cnames \
+            --source-environment-name "$TARGET_ENVIRONMENT_NAME" \
+            --destination-environment-name "$OLD_ENVIRONMENT_NAME"
+
+      - name: Decommission old environment
+        if: ${{ env.TERMINATE_OLD_ENVIRONMENT == 'true' }}
+        run: |
+          set -euo pipefail
+          aws elasticbeanstalk terminate-environment \
+            --environment-name "$OLD_ENVIRONMENT_NAME" \
+            --terminate-resources
