@@ -29,6 +29,7 @@ jobs:
           test -f Dockerrun.aws.json
           test -f docker-compose.yml
           grep -q '"AWSEBDockerrunVersion"[[:space:]]*:[[:space:]]*3' Dockerrun.aws.json
+          grep -Eq "^version:[[:space:]]*['\"]?3(['\"])?$" docker-compose.yml
           ! grep -q '"containerDefinitions"' Dockerrun.aws.json
           cat Dockerrun.aws.json
 
