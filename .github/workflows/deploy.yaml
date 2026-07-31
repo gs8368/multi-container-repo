@@ -23,8 +23,18 @@ jobs:
       - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-server
       - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-worker
 
+      - name: Validate EB deployment files
+        run: |
+          set -e
+          test -f Dockerrun.aws.json
+          test -f docker-compose.yml
+          grep -q '"AWSEBDockerrunVersion"[[:space:]]*:[[:space:]]*3' Dockerrun.aws.json
+          cat Dockerrun.aws.json
+
       - name: Generate deployment package
-        run: zip -r deploy.zip . -x '*.git*'
+        run: |
+          zip -r deploy.zip . -x '*.git*'
+          unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml'
 
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v18
