@@ -9,12 +9,27 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+const requiredConfig = [
+  ['REDIS_HOST', keys.redisHost],
+  ['PGUSER', keys.pgUser],
+  ['PGHOST', keys.pgHost],
+  ['PGDATABASE', keys.pgDatabase],
+  ['PGPASSWORD', keys.pgPassword],
+];
+
+const missingConfig = requiredConfig
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+
+if (missingConfig.length > 0) {
+  console.error('Missing required environment variables:', missingConfig.join(', '));
+}
+
 // Postgres Client Setup
 const { Pool } = require('pg');
 
-// In local docker-compose, Postgres usually runs without SSL.
-// Keep SSL opt-in via PGSSLMODE=require for deployed environments.
-const shouldUsePgSsl = process.env.PGSSLMODE === 'require';
+// Local compose usually runs Postgres without SSL, but managed Postgres often requires it.
+const shouldUsePgSsl = keys.pgSslMode === 'require';
 
 const pgClient = new Pool({
   user: keys.pgUser,
@@ -76,6 +91,13 @@ app.get('/values/current', async (req, res) => {
 });
 
 app.post('/values', async (req, res) => {
+  if (missingConfig.length > 0) {
+    return res.status(503).send({
+      error: 'Server is not configured with required environment variables',
+      missing: missingConfig,
+    });
+  }
+
   const rawIndex = req.body.index;
 
   if (rawIndex === undefined || rawIndex === null) {
@@ -103,7 +125,7 @@ app.post('/values', async (req, res) => {
     res.send({ working: true });
   } catch (err) {
     console.error(err);
-    res.status(500).send({ error: 'Could not save value' });
+    res.status(500).send({ error: 'Could not save value', detail: err.message });
   }
 });
 
