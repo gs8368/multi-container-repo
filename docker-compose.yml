@@ -1,10 +1,11 @@
 services:
   client:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-client'
+    image: "gs8368/multi-client:latest"
     mem_limit: 128m
     hostname: client
+
   server:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-server'
+    image: "gs8368/multi-server:latest"
     mem_limit: 128m
     hostname: api
     environment:
@@ -15,16 +16,18 @@ services:
       - PGDATABASE=${PGDATABASE:-fibvalues}
       - PGPASSWORD=${PGPASSWORD:-postgrespassword}
       - PGPORT=${PGPORT:-5432}
+
   worker:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-worker'
+    image: "gs8368/multi-worker:latest"
     mem_limit: 128m
     hostname: worker
     environment:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
+
   nginx:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-nginx'
+    image: "gs8368/multi-nginx:latest"
     mem_limit: 128m
     hostname: nginx
     ports:
-      - '80:80'
+      - "80:80"
