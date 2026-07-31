@@ -37,7 +37,8 @@ jobs:
 
       - name: Generate deployment package
         run: |
-          zip -r deploy.zip . -x '*.git*'
+          rm -f deploy.zip
+          zip -r deploy.zip Dockerrun.aws.json docker-compose.yml
           unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml'
           unzip -p deploy.zip Dockerrun.aws.json
 
