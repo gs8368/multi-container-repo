@@ -28,7 +28,6 @@ jobs:
           set -e
           test -f Dockerrun.aws.json
           test -f docker-compose.yml
-          test -d .ebextensions
           test -d client
           test -d server
           test -d worker
@@ -53,8 +52,8 @@ jobs:
       - name: Generate deployment package
         run: |
           rm -f deploy.zip
-          zip -r deploy.zip Dockerrun.aws.json docker-compose.yml .ebextensions client server worker nginx .platform
-          unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml|command-timeout.config|Dockerfile.dev|package.json|default.conf'
+          zip -r deploy.zip Dockerrun.aws.json docker-compose.yml client server worker nginx .platform
+          unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml|Dockerfile.dev|package.json|default.conf'
           unzip -p deploy.zip Dockerrun.aws.json
 
       - name: Wait for EB environment to be Ready
