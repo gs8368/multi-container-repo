@@ -37,6 +37,7 @@ jobs:
           aws elasticbeanstalk describe-environments \
             --application-name multi-docker \
             --environment-names Multi-docker-env \
+            --region ap-south-1 \
             --query 'Environments[0].[EnvironmentName,PlatformArn,SolutionStackName]' \
             --output table
 
