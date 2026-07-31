@@ -28,9 +28,8 @@ jobs:
 
       - name: Generate deployment package
         run: |
-          zip -r deploy.zip . -x '*.git*'
-          unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml'
-          unzip -p deploy.zip Dockerrun.aws.json
+         run: zip -r deploy.zip . -x '*.git*'
+
 
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v18
