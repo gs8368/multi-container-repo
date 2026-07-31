@@ -13,7 +13,7 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - PGUSER=${PGUSER:-postgres}
       - PGHOST=${PGHOST:-postgres}
-      - PGDATABASE=${PGDATABASE:-fibvalues}
+      - PGDATABASE=${PGDATABASE:-postgres}
       - PGPASSWORD=${PGPASSWORD:-postgrespassword}
       - PGPORT=${PGPORT:-5432}
 
