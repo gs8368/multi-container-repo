@@ -32,6 +32,14 @@ jobs:
           ! grep -q '"containerDefinitions"' Dockerrun.aws.json
           cat Dockerrun.aws.json
 
+      - name: Print EB environment platform
+        run: |
+          aws elasticbeanstalk describe-environments \
+            --application-name multi-docker \
+            --environment-names Multi-docker-env \
+            --query 'Environments[0].[EnvironmentName,PlatformArn,SolutionStackName]' \
+            --output table
+
 
 
 
