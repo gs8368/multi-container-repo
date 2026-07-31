@@ -1,15 +1,11 @@
 version: '3'
 services:
   client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile.dev
+    image: 'gurpreet1993/multi-client'
     mem_limit: 128m
     hostname: client
-  api:
-    build:
-      context: ./server
-      dockerfile: Dockerfile.dev
+  server:
+    image: 'gurpreet1993/multi-server'
     mem_limit: 128m
     hostname: api
     environment:
@@ -21,18 +17,14 @@ services:
       - PGPASSWORD=$PGPASSWORD
       - PGPORT=$PGPORT
   worker:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile.dev
+    image: 'gurpreet1993/multi-worker'
     mem_limit: 128m
     hostname: worker
     environment:
       - REDIS_HOST=$REDIS_HOST
       - REDIS_PORT=$REDIS_PORT
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile.dev
+    image: 'gurpreet1993/multi-nginx'
     mem_limit: 128m
     hostname: nginx
     ports:
