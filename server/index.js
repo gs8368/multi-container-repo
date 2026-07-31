@@ -40,6 +40,15 @@ const redisClient = redis.createClient({
 });
 const redisPublisher = redisClient.duplicate();
 
+// Prevent process crashes when Redis is temporarily unavailable.
+redisClient.on('error', (err) => {
+  console.error('Redis client error:', err.message);
+});
+
+redisPublisher.on('error', (err) => {
+  console.error('Redis publisher error:', err.message);
+});
+
 // Express route handlers
 
 app.get('/', (req, res) => {
@@ -58,6 +67,10 @@ app.get('/values/all', async (req, res) => {
 
 app.get('/values/current', async (req, res) => {
   redisClient.hgetall('values', (err, values) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send({ error: 'Could not fetch current values' });
+    }
     res.send(values);
   });
 });

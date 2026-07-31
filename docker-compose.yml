@@ -4,7 +4,7 @@ services:
     image: 'rallycoding/multi-client'
     mem_limit: 128m
     hostname: client
-  server:
+  api:
     image: 'rallycoding/multi-server'
     mem_limit: 128m
     hostname: api

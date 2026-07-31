@@ -8,6 +8,14 @@ const redisClient = redis.createClient({
 });
 const sub = redisClient.duplicate();
 
+redisClient.on('error', (err) => {
+  console.error('Redis client error:', err.message);
+});
+
+sub.on('error', (err) => {
+  console.error('Redis subscriber error:', err.message);
+});
+
 function fib(index) {
   if (index < 2) return 1;
   return fib(index - 1) + fib(index - 2);
