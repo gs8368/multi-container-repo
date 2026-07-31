@@ -1,29 +1,30 @@
+version: '3'
 services:
   client:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-client'
+    image: 'rallycoding/multi-client'
     mem_limit: 128m
     hostname: client
   server:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-server'
+    image: 'rallycoding/multi-server'
     mem_limit: 128m
     hostname: api
     environment:
-      - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - PGUSER=${PGUSER:-postgres}
-      - PGHOST=${PGHOST:-postgres}
-      - PGDATABASE=${PGDATABASE:-fibvalues}
-      - PGPASSWORD=${PGPASSWORD:-postgrespassword}
-      - PGPORT=${PGPORT:-5432}
+      - REDIS_HOST=$REDIS_HOST
+      - REDIS_PORT=$REDIS_PORT
+      - PGUSER=$PGUSER
+      - PGHOST=$PGHOST
+      - PGDATABASE=$PGDATABASE
+      - PGPASSWORD=$PGPASSWORD
+      - PGPORT=$PGPORT
   worker:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-worker'
+    image: 'rallycoding/multi-worker'
     mem_limit: 128m
     hostname: worker
     environment:
-      - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=$REDIS_HOST
+      - REDIS_PORT=$REDIS_PORT
   nginx:
-    image: '${DOCKER_USERNAME:-rallycoding}/multi-nginx'
+    image: 'rallycoding/multi-nginx'
     mem_limit: 128m
     hostname: nginx
     ports:
