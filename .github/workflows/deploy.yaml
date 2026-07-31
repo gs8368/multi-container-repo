@@ -57,6 +57,56 @@ jobs:
           unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml|command-timeout.config|Dockerfile.dev|package.json|default.conf'
           unzip -p deploy.zip Dockerrun.aws.json
 
+      - name: Wait for EB environment to be Ready
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+        run: |
+          set -euo pipefail
+
+          APP_NAME="multi-docker"
+          ENV_NAME="Multi-docker-env"
+          REGION="ap-south-1"
+          MAX_ATTEMPTS=40
+          SLEEP_SECONDS=30
+
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$ENV_NAME" \
+              --region "$REGION" \
+              --query 'Environments[0].Status' \
+              --output text)
+
+            HEALTH=$(aws elasticbeanstalk describe-environments \
+              --application-name "$APP_NAME" \
+              --environment-names "$ENV_NAME" \
+              --region "$REGION" \
+              --query 'Environments[0].Health' \
+              --output text)
+
+            echo "Attempt $attempt/$MAX_ATTEMPTS: status=$STATUS health=$HEALTH"
+
+            if [ "$STATUS" = "Ready" ]; then
+              echo "Environment is Ready. Proceeding with deployment."
+              break
+            fi
+
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "Environment did not reach Ready state in time."
+              aws elasticbeanstalk describe-events \
+                --environment-name "$ENV_NAME" \
+                --region "$REGION" \
+                --max-items 20 \
+                --query 'Events[].{Time:EventDate,Severity:Severity,Message:Message}' \
+                --output table
+              exit 1
+            fi
+
+            sleep "$SLEEP_SECONDS"
+          done
+
 
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v18
