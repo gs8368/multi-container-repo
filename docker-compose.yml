@@ -1,11 +1,15 @@
 version: '3'
 services:
   client:
-    image: 'gs8368/multi-client'
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
     mem_limit: 128m
     hostname: client
   api:
-    image: 'gs8368/multi-server'
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
     mem_limit: 128m
     hostname: api
     environment:
@@ -17,14 +21,18 @@ services:
       - PGPASSWORD=$PGPASSWORD
       - PGPORT=$PGPORT
   worker:
-    image: 'gs8368/multi-worker'
+    build:
+      context: ./worker
+      dockerfile: Dockerfile.dev
     mem_limit: 128m
     hostname: worker
     environment:
       - REDIS_HOST=$REDIS_HOST
       - REDIS_PORT=$REDIS_PORT
   nginx:
-    image: 'gs8368/multi-nginx'
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.dev
     mem_limit: 128m
     hostname: nginx
     ports:
