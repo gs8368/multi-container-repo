@@ -53,6 +53,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
           AWS_DEFAULT_REGION: ap-south-1
         run: |
+          aws elasticbeanstalk wait environment-updated \
+            --environment-name Multi-docker-env \
+            --region ap-south-1
           cat > eb-options.json <<EOF
           [
             {"Namespace":"aws:elasticbeanstalk:application:environment","OptionName":"DOCKER_USERNAME","Value":"${{ secrets.DOCKER_USERNAME }}"},
@@ -62,6 +65,16 @@ jobs:
           aws elasticbeanstalk update-environment \
             --environment-name Multi-docker-env \
             --option-settings file://eb-options.json \
+            --region ap-south-1
+
+      - name: Wait for EB to be Ready
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --environment-name Multi-docker-env \
             --region ap-south-1
 
 
