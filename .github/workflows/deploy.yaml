@@ -10,124 +10,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/react-test -f ./client/Dockerfile.dev ./client
-      - run: docker run -e CI=true ${{ secrets.DOCKER_USERNAME }}/react-test npm test
+      - run: docker build -t rallycoding/react-test -f ./client/Dockerfile.dev ./client
+      - run: docker run -e CI=true rallycoding/react-test npm test
 
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-client -f ./client/Dockerfile.dev ./client
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-nginx -f ./nginx/Dockerfile .
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-server -f ./server/Dockerfile.dev ./server
-      - run: docker build -t ${{ secrets.DOCKER_USERNAME }}/multi-worker -f ./worker/Dockerfile.dev ./worker
+      - run: docker build -t rallycoding/multi-client ./client
+      - run: docker build -t rallycoding/multi-nginx ./nginx
+      - run: docker build -t rallycoding/multi-server ./server
+      - run: docker build -t rallycoding/multi-worker ./worker
 
-      - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-client
-      - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-nginx
-      - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-server
-      - run: docker push ${{ secrets.DOCKER_USERNAME }}/multi-worker
-
-      - name: Validate EB deployment files
-        run: |
-          set -e
-          test -f Dockerrun.aws.json
-          test -f docker-compose.yml
-          test -d client
-          test -d server
-          test -d worker
-          test -d nginx
-          grep -Eq '"AWSEBDockerrunVersion"[[:space:]]*:[[:space:]]*"?3"?' Dockerrun.aws.json
-          ! grep -q '"containerDefinitions"' Dockerrun.aws.json
-          cat Dockerrun.aws.json
-
-      - name: Print EB environment platform
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
-        run: |
-          aws elasticbeanstalk describe-environments \
-            --application-name multi-docker \
-            --environment-names Multi-docker-env \
-            --region ap-south-1 \
-            --query 'Environments[0].[EnvironmentName,PlatformArn,SolutionStackName]' \
-            --output table
+      - run: docker push rallycoding/multi-client
+      - run: docker push rallycoding/multi-nginx
+      - run: docker push rallycoding/multi-server
+      - run: docker push rallycoding/multi-worker
 
       - name: Generate deployment package
-        run: |
-          rm -f deploy.zip
-          rm -rf deploy_bundle
-          mkdir -p deploy_bundle
-
-          cp Dockerrun.aws.json deploy_bundle/
-          cp docker-compose.yml deploy_bundle/docker-compose.yml
-          cp -r client server worker nginx deploy_bundle/
-
-          if [ -d .platform ]; then
-            cp -r .platform deploy_bundle/
-          fi
-
-          # Keep deployed image names aligned with what CI just pushed.
-          sed -i "s|gurpreet1993/|${{ secrets.DOCKER_USERNAME }}/|g" deploy_bundle/docker-compose.yml
-          grep -E "image:" deploy_bundle/docker-compose.yml
-
-          FILES=(Dockerrun.aws.json docker-compose.yml client server worker nginx)
-          if [ -d deploy_bundle/.platform ]; then
-            FILES+=(.platform)
-          fi
-
-          (
-            cd deploy_bundle
-            zip -r ../deploy.zip "${FILES[@]}"
-          )
-          unzip -l deploy.zip | grep -E 'Dockerrun.aws.json|docker-compose.yml|Dockerfile.dev|package.json|default.conf'
-          unzip -p deploy.zip Dockerrun.aws.json
-
-      - name: Wait for EB environment to be Ready
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-          AWS_DEFAULT_REGION: ap-south-1
-        run: |
-          set -euo pipefail
-
-          APP_NAME="multi-docker"
-          ENV_NAME="Multi-docker-env"
-          REGION="ap-south-1"
-          MAX_ATTEMPTS=40
-          SLEEP_SECONDS=30
-
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            STATUS=$(aws elasticbeanstalk describe-environments \
-              --application-name "$APP_NAME" \
-              --environment-names "$ENV_NAME" \
-              --region "$REGION" \
-              --query 'Environments[0].Status' \
-              --output text)
-
-            HEALTH=$(aws elasticbeanstalk describe-environments \
-              --application-name "$APP_NAME" \
-              --environment-names "$ENV_NAME" \
-              --region "$REGION" \
-              --query 'Environments[0].Health' \
-              --output text)
-
-            echo "Attempt $attempt/$MAX_ATTEMPTS: status=$STATUS health=$HEALTH"
-
-            if [ "$STATUS" = "Ready" ]; then
-              echo "Environment is Ready. Proceeding with deployment."
-              break
-            fi
-
-            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "Environment did not reach Ready state in time."
-              aws elasticbeanstalk describe-events \
-                --environment-name "$ENV_NAME" \
-                --region "$REGION" \
-                --max-items 20 \
-                --query 'Events[].{Time:EventDate,Severity:Severity,Message:Message}' \
-                --output table
-              exit 1
-            fi
-
-            sleep "$SLEEP_SECONDS"
-          done
+        run: zip -r deploy.zip . -x '*.git*'
 
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v18
@@ -138,5 +35,5 @@ jobs:
           environment_name: Multi-docker-env
           existing_bucket_name: elasticbeanstalk-ap-south-1-243490674618
           region: ap-south-1
-          version_label: ${{ github.sha }}-${{ github.run_id }}
+          version_label: ${{ github.sha }}
           deployment_package: deploy.zip

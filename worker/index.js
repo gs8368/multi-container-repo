@@ -8,31 +8,12 @@ const redisClient = redis.createClient({
 });
 const sub = redisClient.duplicate();
 
-redisClient.on('error', (err) => {
-  console.error('Redis client error:', err.message);
-});
-
-sub.on('error', (err) => {
-  console.error('Redis subscriber error:', err.message);
-});
-
 function fib(index) {
   if (index < 2) return 1;
   return fib(index - 1) + fib(index - 2);
 }
 
 sub.on('message', (channel, message) => {
-  const index = Number(message);
-
-  if (!Number.isInteger(index) || index < 0) {
-    return;
-  }
-
-  if (index > 40) {
-    redisClient.hset('values', message, 'Index too high');
-    return;
-  }
-
-  redisClient.hset('values', message, fib(index));
+  redisClient.hset('values', message, fib(parseInt(message)));
 });
 sub.subscribe('insert');
