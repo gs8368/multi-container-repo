@@ -7,21 +7,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_REPO: ${{ secrets.DOCKER_USERNAME }}
     steps:
       - uses: actions/checkout@v3
-      - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-      - run: docker build -t rallycoding/react-test -f ./client/Dockerfile.dev ./client
-      - run: docker run -e CI=true rallycoding/react-test npm test
+      - run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - run: docker build -t $DOCKER_REPO/react-test -f ./client/Dockerfile.dev ./client
+      - run: docker run -e CI=true $DOCKER_REPO/react-test npm test
 
-      - run: docker build -t rallycoding/multi-client ./client
-      - run: docker build -t rallycoding/multi-nginx ./nginx
-      - run: docker build -t rallycoding/multi-server ./server
-      - run: docker build -t rallycoding/multi-worker ./worker
+      - run: docker build -t $DOCKER_REPO/multi-client ./client
+      - run: docker build -t $DOCKER_REPO/multi-nginx ./nginx
+      - run: docker build -t $DOCKER_REPO/multi-server ./server
+      - run: docker build -t $DOCKER_REPO/multi-worker ./worker
 
-      - run: docker push rallycoding/multi-client
-      - run: docker push rallycoding/multi-nginx
-      - run: docker push rallycoding/multi-server
-      - run: docker push rallycoding/multi-worker
+      - run: docker push $DOCKER_REPO/multi-client
+      - run: docker push $DOCKER_REPO/multi-nginx
+      - run: docker push $DOCKER_REPO/multi-server
+      - run: docker push $DOCKER_REPO/multi-worker
+
+      - name: Inject Docker repo into compose file
+        run: sed -i "s|\${DOCKER_USERNAME}|$DOCKER_REPO|g" docker-compose.yml
 
       - name: Generate deployment package
         run: zip -r deploy.zip . -x '*.git*'
